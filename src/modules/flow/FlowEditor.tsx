@@ -287,8 +287,16 @@ export const FlowEditor: React.FC = () => {
       setNodes(ns => ns.map(n => n.id === nodeId ? { ...n, selected: true } : { ...n, selected: false }));
       const found = nodes.find(n => n.id === nodeId); if (found) setSelected(found as Node);
     };
+    const clearHandler = () => {
+      setSelected(undefined);
+      setNodes(ns => ns.map(n => (n.selected ? { ...n, selected: false } : n)));
+    };
     window.addEventListener('externalNodeSelect', handler as EventListener);
-    return () => window.removeEventListener('externalNodeSelect', handler as EventListener);
+    window.addEventListener('clearFlowSelection', clearHandler as EventListener);
+    return () => {
+      window.removeEventListener('externalNodeSelect', handler as EventListener);
+      window.removeEventListener('clearFlowSelection', clearHandler as EventListener);
+    };
   }, [nodes, setNodes]);
 
   // Delete selected node with Delete / Backspace key

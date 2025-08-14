@@ -16,36 +16,51 @@ export const DragAndDropPanel: React.FC = () => {
     const acqFilter = acquirer.trim().toLowerCase();
     const titleFilter = title.trim().toLowerCase();
     const first: { value: FirstMatch | null } = { value: null };
-    reactFlow.setNodes(ns => ns.map(n => {
-      if (n.type === 'payment') {
-        return { ...n, data: { ...n.data, filterPaymentStatus: filterStatus || '', filterAcquirer: acquirer || '', filterTitle: title || '' } };
-      }
-      if (n.type === 'subflow') {
+    reactFlow.setNodes(ns => {
+      // First pass: determine subflow matches without mutating original array dependence
+      const subflowMatch: Record<string, boolean> = {};
+      ns.forEach(n => {
+        if (n.type !== 'subflow') return;
         const d = n.data || {};
         const matched = (!statusFilter || (d.paymentStatus || '').toLowerCase() === statusFilter)
           && (!acqFilter || (d.acquirer || '').toLowerCase().includes(acqFilter))
           && (!titleFilter || (d.title || '').toLowerCase().includes(titleFilter));
-        if (matched && !first.value) {
+        subflowMatch[n.id] = matched;
+      });
+      // Determine first matched for centering
+      ns.some(n => {
+        if (n.type === 'subflow' && subflowMatch[n.id]) {
           const w = (n.style?.width as number) || 400;
           first.value = { x: (n.positionAbsolute?.x ?? n.position.x), y: (n.positionAbsolute?.y ?? n.position.y), w };
+          return true;
         }
-        if (d.searchMatch === matched) return n;
-        return { ...n, data: { ...d, searchMatch: matched } };
-      }
-      if (n.type === 'action') {
-        const parentMatched = n.parentNode ? (ns.find(s => s.id === n.parentNode)?.data?.searchMatch || false) : false;
-        const d = n.data || {};
-        if (d.searchMatch === parentMatched) return n;
-        return { ...n, data: { ...d, searchMatch: parentMatched } };
-      }
-      return n;
-    }));
+        return false;
+      });
+      // Second pass: apply searchMatch + fade classes
+      return ns.map(n => {
+        if (n.type === 'payment') {
+          return { ...n, data: { ...n.data, filterPaymentStatus: filterStatus || '', filterAcquirer: acquirer || '', filterTitle: title || '' }, className: (n.className || '').replace(/\bflow-faded\b/g,'').trim() };
+        }
+        if (n.type === 'subflow') {
+          const matched = subflowMatch[n.id];
+          const d = n.data || {};
+          const base = { ...n, data: { ...d, searchMatch: matched } };
+          return matched ? { ...base, className: (base.className||'').replace(/\bflow-faded\b/g,'').trim() } : { ...base, className: ((base.className||'').replace(/\bflow-faded\b/g,'').trim() + ' flow-faded').trim() };
+        }
+        if (n.type === 'action') {
+          const parentMatched = n.parentNode ? subflowMatch[n.parentNode] : false;
+          const d = n.data || {};
+          const base = { ...n, data: { ...d, searchMatch: parentMatched } };
+          return parentMatched ? { ...base, className: (base.className||'').replace(/\bflow-faded\b/g,'').trim() } : { ...base, className: ((base.className||'').replace(/\bflow-faded\b/g,'').trim() + ' flow-faded').trim() };
+        }
+        return n;
+      });
+    });
     if (first.value) {
       const { x, y, w } = first.value;
-      try { reactFlow.setCenter?.(x + w / 2, y + 40, { zoom: 1, duration: 300 }); } catch (_err) {
-        // ignore viewport centering errors
-      }
+      try { reactFlow.setCenter?.(x + w / 2, y + 40, { zoom: 1, duration: 300 }); } catch (_err) { /* ignore */ }
     }
+    window.dispatchEvent(new CustomEvent('clearFlowSelection'));
   }, [reactFlow, filterStatus, acquirer, title]);
 
   const clearFilter = () => {

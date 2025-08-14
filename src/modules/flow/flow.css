@@ -8,3 +8,6 @@
 .react-flow__node.subflow-node, .react-flow__node.subflow-node.subflow-no-transition { transition: none !important; }
 /* Disable transform animation for child nodes during subflow drag */
 .react-flow__node.node-no-transition { transition: none !important; }
+
+/* Faded nodes when not matching current query */
+.flow-faded { opacity: 0.25 !important; filter: grayscale(0.6) brightness(0.95); }
