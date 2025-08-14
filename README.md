@@ -22,13 +22,3 @@ npm run dev
 ```
 
 Open http://localhost:5173
-
-## Script JSON Shape
-See `src/modules/scripts/types.ts` for interfaces. Nodes and edges conform to React Flow types.
-
-## Next Ideas
-- UI for editing node details (expressions, actions, accounts, amounts)
-- Import JSON
-- Validation & versioning
-- Persistence (localStorage / API)
-- Test harness & sample transactions
