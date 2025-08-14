@@ -4,7 +4,13 @@ import 'reactflow/dist/style.css';
 import { DragAndDropPanel } from './DragAndDropPanel';
 import './flow.css';
 import { nodeTypes } from './Nodes';
-import { LAYOUT } from './layoutConfig';
+// Inlined layout configuration (moved from layoutConfig.ts)
+const LAYOUT = {
+  paymentRoot: { x: 40, y: 40 },
+  subflowGrid: { marginX: 50, marginY: 50, gapX: 80, gapY: 80 },
+  subflowSize: { padding: 30, minWidth: 300, minHeight: 200 },
+  actionLayout: { nodeWidth: 160, nodeHeight: 70, gapX: 40, gapY: 90, innerPaddingX: 40, startY: 140 }
+} as const;
 
 // --- Helpers ---------------------------------------------------------------
 
@@ -270,11 +276,6 @@ export const FlowEditor: React.FC = () => {
     // Manual edge creation disabled
   }, []);
 
-  const handleExport = () => {
-    const json = JSON.stringify({ nodes, edges }, null, 2);
-    navigator.clipboard.writeText(json).catch(console.error);
-    alert('Graph copied to clipboard');
-  };
 
   const onSelectionChange = (params: OnSelectionChangeParams) => {
     setSelected(params.nodes[0]);
@@ -344,10 +345,7 @@ export const FlowEditor: React.FC = () => {
   }, [selected, setNodes, setEdges]);
 
   return (
-    <div className={"flex-1 h-full relative " + (paymentDragging ? 'payment-dragging' : '')}>
-      <div className="absolute z-10 top-2 left-2 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded shadow flex gap-2 text-xs border border-neutral-200">
-        <button className="px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors" onClick={handleExport}>Export JSON</button>
-      </div>
+  <div className={"flex-1 h-full relative " + (paymentDragging ? 'payment-dragging' : '')}>
       <ReactFlow
         nodes={nodes as Node[]}
         edges={edges}

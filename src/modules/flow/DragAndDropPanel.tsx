@@ -85,9 +85,12 @@ export const DragAndDropPanel: React.FC = () => {
     const id = uuid();
     const width = 400;
     const height = 300;
-    // Find a free spot (simple grid scan avoiding overlaps with existing subflows)
-    const existingSubflows = reactFlow.getNodes().filter(n => n.type === 'subflow');
-    const startX = 50, startY = 50;
+  // Find a free spot (simple grid scan avoiding overlaps with existing subflows) always BELOW payment node
+  const nodes = reactFlow.getNodes();
+  const payment = nodes.find(n => n.type === 'payment');
+  const paymentBottom = payment ? (payment.position.y + 120) : 50; // 120px vertical buffer below payment root
+  const existingSubflows = nodes.filter(n => n.type === 'subflow');
+  const startX = 50, startY = paymentBottom;
     const stepX = width + 80; // horizontal gap
     const stepY = height + 80; // vertical gap
     const maxCols = 4;
@@ -116,7 +119,7 @@ export const DragAndDropPanel: React.FC = () => {
       // Fallback: slight random offset if grid filled
       if (existingSubflows.length) {
         const last = existingSubflows[existingSubflows.length - 1];
-        position = { x: last.position.x + 60, y: last.position.y + 60 };
+        position = { x: last.position.x + 60, y: Math.max(last.position.y + 60, paymentBottom) };
       }
     }
     const subflowNode = {
