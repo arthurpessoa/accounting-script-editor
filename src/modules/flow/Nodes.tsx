@@ -44,6 +44,7 @@ export const ActionNode: React.FC<NodeProps> = ({ id, data, selected }) => {
     const current = rf.getNode(id)!;
     const pos = current ? { x: current.position.x, y: current.position.y + 120 } : { x: 120, y: 120 };
     const parentNode = current?.parentNode;
+    
     // Add the new node first
     rf.setNodes(ns => [...ns, { id: newId, type: 'action', position: pos, data: { name: 'action ' + newId.slice(0,4), label: 'action ' + newId.slice(0,4) }, parentNode, extent: parentNode ? 'parent' : undefined }]);
     // Wire edges: insert into existing single-successor chain if present
@@ -196,14 +197,13 @@ const SubflowNode: React.FC<NodeProps> = ({ id, data }) => {
             <button className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 text-white flex items-center gap-1" onClick={commit}>💾 <span>Save</span></button>
             <button className="text-[10px] px-2 py-1 rounded bg-neutral-300 hover:bg-neutral-200 flex items-center gap-1" onClick={cancel}>✖ <span>Cancel</span></button>
           </div>
-          <div className="text-[10px] opacity-60">esc to cancel • enter to save</div>
         </div>
       ) : (
         <div className="text-[12px]">
           <div className="font-semibold">{title}</div>
-          <div className="opacity-75 mt-0.5">Status: {paymentStatus}</div>
+          <div className="opacity-75 mt-0.5">Payment Status: {paymentStatus}</div>
           {acquirer && <div className="opacity-75">Acquirer: {acquirer}</div>}
-          <div className="absolute top-1 right-1 text-[10px] opacity-60">double-click to edit</div>
+          <div className="absolute top-1 right-1 text-[10px] opacity-60">editar</div>
         </div>
       )}
     </div>

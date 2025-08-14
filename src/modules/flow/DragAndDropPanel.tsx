@@ -136,7 +136,7 @@ export const DragAndDropPanel: React.FC = () => {
       id: actionId,
       type: 'action' as const,
       position: { x: 40, y: 40 }, // margin from top-left
-      data: { name: 'Empty Action', label: 'Empty Action', creditAccount: '', debitAccount: '' },
+      data: { name: 'Nova Movimentação', label: 'Nova Movimentação', creditAccount: '', debitAccount: '' },
       parentNode: id,
       extent: 'parent' as const
     };
@@ -152,19 +152,8 @@ export const DragAndDropPanel: React.FC = () => {
 
   return (
     <div className="dnd-panel flex flex-col gap-3 text-xs max-w-[220px]">
-      <div className="flex flex-col gap-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600">Add</h4>
-        <button
-          onClick={addSubflow}
-          className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-          title="Add Subflow"
-          aria-label="Add Subflow"
-        >
-          ➕ <span>Add Subflow</span>
-        </button>
-      </div>
       <div className="flex flex-col gap-2 border-t pt-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600">Find Subflows</h4>
+        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600">Buscar</h4>
         <div className="flex flex-col gap-1">
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] uppercase tracking-wide text-neutral-500">Payment Status</span>
@@ -184,18 +173,29 @@ export const DragAndDropPanel: React.FC = () => {
           </label>
           <label className="inline-flex items-center gap-1 mt-1 select-none cursor-pointer text-[11px]">
             <input type="checkbox" checked={autoApply} onChange={e=>setAutoApply(e.target.checked)} className="scale-90" />
-            <span>Auto apply</span>
+            <span>Aplicar automaticamente</span>
           </label>
           {!autoApply && (
             <div className="flex gap-2 mt-1">
-              <button onClick={applyFilter} className="flex-1 px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-[11px] flex items-center gap-1" title="Apply Filters" aria-label="Apply Filters">✅ <span>Apply</span></button>
-              <button onClick={clearFilter} className="px-2 py-1 rounded bg-neutral-200 hover:bg-neutral-300 text-[11px] flex items-center gap-1" title="Clear Filters" aria-label="Clear Filters">🧹 <span>Clear</span></button>
+              <button onClick={applyFilter} className="flex-1 px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white text-[11px] flex items-center gap-1" title="Apply Filters" aria-label="Apply Filters">✅ <span>Aplicar</span></button>
+              <button onClick={clearFilter} className="px-2 py-1 rounded bg-neutral-200 hover:bg-neutral-300 text-[11px] flex items-center gap-1" title="Clear Filters" aria-label="Clear Filters">🧹 <span>Limpar</span></button>
             </div>
           )}
           {autoApply && (
-            <button onClick={clearFilter} className="mt-1 px-2 py-1 rounded bg-neutral-200 hover:bg-neutral-300 text-[11px] flex items-center gap-1" title="Clear Filters" aria-label="Clear Filters">🧹 <span>Clear</span></button>
+            <button onClick={clearFilter} className="mt-1 px-2 py-1 rounded bg-neutral-200 hover:bg-neutral-300 text-[11px] flex items-center gap-1" title="Clear Filters" aria-label="Clear Filters">🧹 <span>Limpar</span></button>
           )}
         </div>
+      </div>
+            <div className="flex flex-col gap-2">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-600">Criar Fluxos</h4>
+        <button
+          onClick={addSubflow}
+          className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          title="Add Subflow"
+          aria-label="Add Subflow"
+        >
+          ➕ <span>Criar Fluxo</span>
+        </button>
       </div>
     </div>
   );
