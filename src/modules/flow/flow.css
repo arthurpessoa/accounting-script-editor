@@ -11,3 +11,12 @@
 
 /* Faded nodes when not matching current query */
 .flow-faded { opacity: 0.25 !important; filter: grayscale(0.6) brightness(0.95); }
+
+/* Disable edge animation while dragging payment root */
+.payment-dragging .react-flow__edge path {
+	stroke-dasharray: none !important;
+	animation: none !important;
+}
+
+/* Disable animation (transform transition) for payment root node */
+.react-flow__node-payment { transition: none !important; }

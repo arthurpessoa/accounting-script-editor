@@ -200,6 +200,7 @@ export const FlowEditor: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selected, setSelected] = useState<Node | undefined>();
+  const [paymentDragging, setPaymentDragging] = useState(false);
   const lastSubflowIdsRef = useRef<string[]>([]);
   // Ensure payment root exists once at mount & whenever nodes array empties
   useEffect(() => { setNodes(ns => ensurePaymentRoot(ns)); }, [setNodes]);
@@ -343,7 +344,7 @@ export const FlowEditor: React.FC = () => {
   }, [selected, setNodes, setEdges]);
 
   return (
-    <div className="flex-1 h-full relative">
+    <div className={"flex-1 h-full relative " + (paymentDragging ? 'payment-dragging' : '')}>
       <div className="absolute z-10 top-2 left-2 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded shadow flex gap-2 text-xs border border-neutral-200">
         <button className="px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors" onClick={handleExport}>Export JSON</button>
       </div>
@@ -354,8 +355,26 @@ export const FlowEditor: React.FC = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
-        onNodeDragStart={(e, node) => { if (node.type === 'subflow') { setNodes(ns => ns.map(n => { if (n.id === node.id) return { ...n, className: ((n.className || '') + ' subflow-no-transition').trim() }; if (n.parentNode === node.id) return { ...n, className: ((n.className || '') + ' node-no-transition').trim() }; return n; })); } }}
-        onNodeDragStop={(e, node) => { if (node.type === 'subflow') { setNodes(ns => ns.map(n => { if (n.id === node.id) return { ...n, className: (n.className || '').replace(/\bsubflow-no-transition\b/g, '').trim() }; if (n.parentNode === node.id) return { ...n, className: (n.className || '').replace(/\bnode-no-transition\b/g, '').trim() }; return n; })); } }}
+        onNodeDragStart={(e, node) => {
+          if (node.type === 'payment') setPaymentDragging(true);
+          if (node.type === 'subflow') {
+            setNodes(ns => ns.map(n => {
+              if (n.id === node.id) return { ...n, className: ((n.className || '') + ' subflow-no-transition').trim() };
+              if (n.parentNode === node.id) return { ...n, className: ((n.className || '') + ' node-no-transition').trim() };
+              return n;
+            }));
+          }
+        }}
+        onNodeDragStop={(e, node) => {
+          if (node.type === 'payment') setPaymentDragging(false);
+          if (node.type === 'subflow') {
+            setNodes(ns => ns.map(n => {
+              if (n.id === node.id) return { ...n, className: (n.className || '').replace(/\bsubflow-no-transition\b/g, '').trim() };
+              if (n.parentNode === node.id) return { ...n, className: (n.className || '').replace(/\bnode-no-transition\b/g, '').trim() };
+              return n;
+            }));
+          }
+        }}
         fitView
         nodeTypes={nodeTypes}
       >
