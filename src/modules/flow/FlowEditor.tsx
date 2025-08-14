@@ -69,6 +69,10 @@ function layoutSubflows(nodes: Node[], previousIds: string[]): Node[] | null {
   const changed = ids.length !== previousIds.length || ids.some((id, i) => id !== previousIds[i]);
   if (!changed) return null;
   const { marginX, marginY, gapX, gapY } = LAYOUT.subflowGrid;
+  // Ensure we start laying out subflows below the payment node (which can be moved)
+  const payment = nodes.find(n => n.type === 'payment');
+  const paymentClearance = 120; // vertical space reserved below payment node
+  const topOffset = payment ? Math.max(marginY, payment.position.y + paymentClearance) : marginY;
   const viewportWidth = window.innerWidth || 1200;
   const widths = subflows.map(sf => (sf.style?.width as number) || (LAYOUT.subflowSize.minWidth + 100));
   const heights = subflows.map(sf => (sf.style?.height as number) || (LAYOUT.subflowSize.minHeight + 100));
@@ -83,7 +87,7 @@ function layoutSubflows(nodes: Node[], previousIds: string[]): Node[] | null {
     const totalRowWidth = cols * cellW + (cols - 1) * gapX;
     const offsetX = Math.max(0, (usableWidth - (totalRowWidth - gapX)) / 2);
     const x = marginX + offsetX + col * (cellW + gapX);
-    const y = marginY + row * (cellH + gapY);
+    const y = topOffset + row * (cellH + gapY);
     const i = next.findIndex(n => n.id === sf.id);
     if (i >= 0 && (Math.abs(next[i].position.x - x) > 1 || Math.abs(next[i].position.y - y) > 1)) {
   next[i] = { ...next[i], position: { x, y } };
