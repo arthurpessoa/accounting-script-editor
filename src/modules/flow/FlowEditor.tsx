@@ -23,15 +23,15 @@ export const FlowEditor: React.FC = () => {
   useEffect(() => {
     setNodes(ns => ns.map(n => {
       if (n.type === 'subflow') {
-        const style = { ...(n.style||{}) };
+        const style = { ...(n.style || {}) };
         // Only override background if it's fully opaque default we previously set
         if (!style.background || style.background === '#f3f4f6') {
           style.background = 'rgba(243,244,246,0.55)';
         }
         style.zIndex = 0;
         style.overflow = 'visible';
-  const className = n.className && n.className.includes('subflow-node') ? n.className : ((n.className ? n.className + ' ' : '') + 'subflow-node');
-  return { ...n, style, className };
+        const className = n.className && n.className.includes('subflow-node') ? n.className : ((n.className ? n.className + ' ' : '') + 'subflow-node');
+        return { ...n, style, className };
       }
       return n;
     }));
@@ -53,7 +53,7 @@ export const FlowEditor: React.FC = () => {
         let maxX = 0, maxY = 0;
         for (const c of children) {
           const cw = (c.width ?? 140); // fallback guess
-            const ch = (c.height ?? 70);
+          const ch = (c.height ?? 70);
           const cx = c.position.x;
           const cy = c.position.y;
           maxX = Math.max(maxX, cx + cw);
@@ -95,29 +95,29 @@ export const FlowEditor: React.FC = () => {
         // Build chain order: find heads (no incoming inside)
         const incomingCount: Record<string, number> = {};
         children.forEach(c => incomingCount[c.id] = 0);
-        insideEdges.forEach(e => { incomingCount[e.target] = (incomingCount[e.target]||0) + 1; });
-        const heads = children.filter(c => (incomingCount[c.id]||0) === 0);
+        insideEdges.forEach(e => { incomingCount[e.target] = (incomingCount[e.target] || 0) + 1; });
+        const heads = children.filter(c => (incomingCount[c.id] || 0) === 0);
         let ordered: typeof children = [];
         if (heads.length === 1) {
           // traverse
-            let currentId = heads[0].id;
-            const safety = children.length + 5;
-            let steps = 0;
-            const visited = new Set<string>();
-            while (currentId && steps < safety && !visited.has(currentId)) {
-              steps++;
-              visited.add(currentId);
-              const node = children.find(c => c.id === currentId);
-              if (node) ordered.push(node);
-              const nextEdge = insideEdges.find(e => e.source === currentId);
-              currentId = nextEdge?.target || '';
-            }
-            if (ordered.length !== children.length) {
-              // fallback to y sort
-              ordered = children.slice().sort((a,b)=>a.position.y - b.position.y);
-            }
+          let currentId = heads[0].id;
+          const safety = children.length + 5;
+          let steps = 0;
+          const visited = new Set<string>();
+          while (currentId && steps < safety && !visited.has(currentId)) {
+            steps++;
+            visited.add(currentId);
+            const node = children.find(c => c.id === currentId);
+            if (node) ordered.push(node);
+            const nextEdge = insideEdges.find(e => e.source === currentId);
+            currentId = nextEdge?.target || '';
+          }
+          if (ordered.length !== children.length) {
+            // fallback to y sort
+            ordered = children.slice().sort((a, b) => a.position.y - b.position.y);
+          }
         } else {
-          ordered = children.slice().sort((a,b)=>a.position.y - b.position.y);
+          ordered = children.slice().sort((a, b) => a.position.y - b.position.y);
         }
         // Responsive grid parameters
         const nodeW = 160;
@@ -125,7 +125,7 @@ export const FlowEditor: React.FC = () => {
         const gapX = 40;
         const gapY = 90;
         const innerPaddingX = 40;
-        const startY = 40;
+        const startY = 140;
         const usableWidth = width - innerPaddingX * 2;
         const columns = Math.max(1, Math.floor((usableWidth + gapX) / (nodeW + gapX)));
         ordered.forEach((node, idx) => {
@@ -170,9 +170,9 @@ export const FlowEditor: React.FC = () => {
           const childIds = new Set(children.map(c => c.id));
           const incomingCounts: Record<string, number> = {};
           children.forEach(c => incomingCounts[c.id] = 0);
-          edges.forEach(e => { if (childIds.has(e.target) && childIds.has(e.source)) incomingCounts[e.target] = (incomingCounts[e.target]||0)+1; });
-          const heads = children.filter(c => (incomingCounts[c.id]||0) === 0);
-          if (heads.length === 1) originId = heads[0].id; else if (heads.length > 1) originId = heads.slice().sort((a,b)=>a.position.y - b.position.y)[0].id; else originId = children.slice().sort((a,b)=>a.position.y - b.position.y)[0].id;
+          edges.forEach(e => { if (childIds.has(e.target) && childIds.has(e.source)) incomingCounts[e.target] = (incomingCounts[e.target] || 0) + 1; });
+          const heads = children.filter(c => (incomingCounts[c.id] || 0) === 0);
+          if (heads.length === 1) originId = heads[0].id; else if (heads.length > 1) originId = heads.slice().sort((a, b) => a.position.y - b.position.y)[0].id; else originId = children.slice().sort((a, b) => a.position.y - b.position.y)[0].id;
         }
       }
       if (!originId && (selected as any).type === 'action') originId = selected.id;
@@ -180,7 +180,7 @@ export const FlowEditor: React.FC = () => {
         // Nothing to highlight
         let changed = false;
         const cleared = ns.map(n => {
-          if (n.data?.highlighted || n.data?.conflict) { changed = true; return { ...n, data: { ...n.data, highlighted:false, conflict:false } }; }
+          if (n.data?.highlighted || n.data?.conflict) { changed = true; return { ...n, data: { ...n.data, highlighted: false, conflict: false } }; }
           return n;
         });
         return changed ? cleared : ns;
@@ -234,7 +234,7 @@ export const FlowEditor: React.FC = () => {
         const hasDup = highlighted && !!name && nameFreq[name] > 1;
         const conflictPrimary = hasDup && firstNameId[name] === n.id;
         const conflict = hasDup && !conflictPrimary;
-        const needsUpdate = (n.data?.highlighted||false) !== highlighted || (n.data?.conflict||false) !== conflict || (n.data?.conflictPrimary||false) !== conflictPrimary || (n.data?.conflictPrimaryId||'') !== (hasDup ? firstNameId[name] : (n.data?.conflictPrimaryId||''));
+        const needsUpdate = (n.data?.highlighted || false) !== highlighted || (n.data?.conflict || false) !== conflict || (n.data?.conflictPrimary || false) !== conflictPrimary || (n.data?.conflictPrimaryId || '') !== (hasDup ? firstNameId[name] : (n.data?.conflictPrimaryId || ''));
         if (needsUpdate) { changed = true; return { ...n, data: { ...n.data, highlighted, conflict, conflictPrimary, conflictPrimaryId: hasDup ? firstNameId[name] : undefined } }; }
         return n;
       });
@@ -243,10 +243,10 @@ export const FlowEditor: React.FC = () => {
   }, [selected, edges, nodes, setNodes]);
 
   // Backfill missing name field for legacy nodes so conflict detection works consistently
-  useEffect(()=>{
+  useEffect(() => {
     setNodes(ns => {
-      let changed=false; const updated = ns.map(n=>{
-        if (n.type==='action' && (!n.data?.name) && n.data?.label) { changed=true; return { ...n, data: { ...n.data, name: n.data.label } }; }
+      let changed = false; const updated = ns.map(n => {
+        if (n.type === 'action' && (!n.data?.name) && n.data?.label) { changed = true; return { ...n, data: { ...n.data, name: n.data.label } }; }
         return n;
       });
       return changed ? updated : ns;
@@ -255,9 +255,9 @@ export const FlowEditor: React.FC = () => {
 
   const onConnect: OnConnect = useCallback((params: Edge | Connection) => {
     setEdges((eds) => {
-      // Enforce: one outgoing edge per source and one incoming edge per target
-      if (eds.some(e => e.source === params.source) || eds.some(e => e.target === params.target)) {
-        return eds; // disallow additional connection
+      // New rule: allow multiple incoming edges, but only one outgoing per source
+      if (eds.some(e => e.source === params.source)) {
+        return eds; // disallow additional outgoing from the same source
       }
       return addEdge({ ...params, animated: true }, eds);
     });
@@ -295,7 +295,7 @@ export const FlowEditor: React.FC = () => {
       if (!selected) return;
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       const target = e.target as HTMLElement | null;
-      if (target && ['INPUT','TEXTAREA'].includes(target.tagName)) return; // avoid interfering with text inputs
+      if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return; // avoid interfering with text inputs
       const deletingId = selected.id;
       const isSubflow = (selected as any).type === 'subflow';
       setNodes(ns => ns.filter(n => n.id !== deletingId && (!isSubflow || n.parentNode !== deletingId)));
@@ -305,16 +305,24 @@ export const FlowEditor: React.FC = () => {
           const childIds = new Set(nodes.filter(n => n.parentNode === deletingId).map(n => n.id));
           return es.filter(e => e.source !== deletingId && e.target !== deletingId && !childIds.has(e.source) && !childIds.has(e.target));
         }
-        // For action node: linked-list rewiring
-        const incoming = es.find(e => e.target === deletingId);
+        // For action node: rewiring to preserve linear progress for predecessors.
+        // Collect ALL incoming predecessors (can be multiple now) and single outgoing successor (still only one allowed).
+        const incomings = es.filter(e => e.target === deletingId);
         const outgoing = es.find(e => e.source === deletingId);
         let filtered = es.filter(e => e.source !== deletingId && e.target !== deletingId);
-        if (incoming && outgoing) {
-          const predecessorHasOtherOut = filtered.some(e => e.source === incoming.source);
-          const successorHasOtherIn = filtered.some(e => e.target === outgoing.target);
-          if (!predecessorHasOtherOut && !successorHasOtherIn) {
-            filtered = [...filtered, { id: `${incoming.source}-${outgoing.target}`, source: incoming.source, target: outgoing.target, animated: true } as Edge];
-          }
+        if (outgoing && incomings.length) {
+          const successor = outgoing.target;
+          incomings.forEach(inc => {
+            // After deletion, inc.source will have no outgoing (since its only outgoing was to deletingId) unless it had some parallel edge (shouldn't due to rule).
+            const sourceHasOtherOutgoing = filtered.some(e => e.source === inc.source);
+            if (!sourceHasOtherOutgoing) {
+              const edgeId = `${inc.source}-${successor}`;
+              const duplicate = filtered.some(e => e.id === edgeId || (e.source === inc.source && e.target === successor));
+              if (!duplicate) {
+                filtered = [...filtered, { id: edgeId, source: inc.source, target: successor, animated: true } as Edge];
+              }
+            }
+          });
         }
         return filtered;
       });
@@ -325,9 +333,9 @@ export const FlowEditor: React.FC = () => {
   }, [selected, setNodes, setEdges]);
 
   return (
-    <div className="flow-container">
-      <div className="toolbar">
-        <button onClick={handleExport}>Export JSON</button>
+    <div className="flex-1 h-full relative">
+      <div className="absolute z-10 top-2 left-2 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded shadow flex gap-2 text-xs border border-neutral-200">
+        <button className="px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium transition-colors" onClick={handleExport}>Export JSON</button>
       </div>
       <ReactFlow
         nodes={nodes as Node[]}
@@ -338,16 +346,16 @@ export const FlowEditor: React.FC = () => {
         onSelectionChange={onSelectionChange}
         onNodeDragStart={(e, node) => {
           if (node.type === 'subflow') {
-            setNodes(ns => ns.map(n => n.id === node.id ? { ...n, className: ((n.className||'') + ' subflow-no-transition').trim() } : n));
+            setNodes(ns => ns.map(n => n.id === node.id ? { ...n, className: ((n.className || '') + ' subflow-no-transition').trim() } : n));
             // add no-transition class to children for drag duration
-            setNodes(ns => ns.map(n => n.parentNode === node.id ? { ...n, className: ((n.className||'') + ' node-no-transition').trim() } : n));
+            setNodes(ns => ns.map(n => n.parentNode === node.id ? { ...n, className: ((n.className || '') + ' node-no-transition').trim() } : n));
           }
         }}
         onNodeDragStop={(e, node) => {
           if (node.type === 'subflow') {
-            setNodes(ns => ns.map(n => n.id === node.id ? { ...n, className: (n.className||'').replace(/\bsubflow-no-transition\b/g,'').trim() } : n));
+            setNodes(ns => ns.map(n => n.id === node.id ? { ...n, className: (n.className || '').replace(/\bsubflow-no-transition\b/g, '').trim() } : n));
             // remove no-transition from children
-            setNodes(ns => ns.map(n => n.parentNode === node.id ? { ...n, className: (n.className||'').replace(/\bnode-no-transition\b/g,'').trim() } : n));
+            setNodes(ns => ns.map(n => n.parentNode === node.id ? { ...n, className: (n.className || '').replace(/\bnode-no-transition\b/g, '').trim() } : n));
           }
         }}
         fitView

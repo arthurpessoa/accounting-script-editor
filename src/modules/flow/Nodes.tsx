@@ -71,44 +71,52 @@ export const ActionNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   };
 
   return (
-  <div style={{ padding: 10, border: `${selected ? '2px' : '1px'} solid ${selected ? '#0ea5e9' : (data?.conflict ? '#d1d5db' : (data?.highlighted ? '#16a34a' : '#3b82f6'))}`, boxShadow: selected ? '0 0 0 2px rgba(14,165,233,0.25)' : 'none', borderRadius: 6, background: data?.conflict ? '#f3f4f6' : (data?.highlighted ? '#dcfce7' : '#eff6ff'), minWidth: 140, position:'relative', transition:'border-color 150ms ease, background-color 150ms ease, opacity 150ms ease, box-shadow 150ms ease', opacity: data?.conflict ? 0.85 : 1 }} onDoubleClick={() => setEditing(true)}
-       onMouseEnter={showConflict}
-       onMouseLeave={scheduleHideConflict}>
-      <strong>Action</strong>
-      <div style={{ fontSize: 12, display:'flex', flexDirection:'column', gap:4 }}>
+  <div
+    className={[
+      'relative min-w-[140px] rounded-md p-2 text-[12px] transition-colors duration-150',
+      'shadow-sm',
+      selected ? 'border-2 border-sky-500 shadow-[0_0_0_2px_rgba(14,165,233,0.25)]' : 'border',
+  data?.conflict ? 'bg-neutral-100 border-neutral-300 opacity-[0.85]' : (data?.highlighted ? 'bg-green-100 border-green-600' : 'bg-sky-50 border-sky-600')
+    ].join(' ')}
+    onDoubleClick={() => setEditing(true)}
+    onMouseEnter={showConflict}
+    onMouseLeave={scheduleHideConflict}
+  >
+      <strong className="font-semibold text-[11px] uppercase tracking-wide text-neutral-600">Action</strong>
+      <div className="flex flex-col gap-1 mt-1">
         {editing ? (
-          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          <div className="flex flex-col gap-1">
             <input
               ref={inputRef}
               placeholder="Name"
               value={value}
-              style={{ width: '100%', fontSize: 12 }}
+              className="w-full text-[12px] px-1 py-0.5 border rounded"
               onChange={e => setValue(e.target.value)}
               onKeyDown={onKeyDown}
             />
             <input
               placeholder="CreditAccount"
               value={credit}
-              style={{ width: '100%', fontSize: 12 }}
+              className="w-full text-[12px] px-1 py-0.5 border rounded"
               onChange={e => setCredit(e.target.value)}
               onKeyDown={onKeyDown}
             />
             <input
               placeholder="DebitAccount"
               value={debit}
-              style={{ width: '100%', fontSize: 12 }}
+              className="w-full text-[12px] px-1 py-0.5 border rounded"
               onChange={e => setDebit(e.target.value)}
               onKeyDown={onKeyDown}
             />
-            <div style={{ display:'flex', gap:4 }}>
-              <button style={{ fontSize:10 }} onClick={commit}>Save</button>
-              <button style={{ fontSize:10 }} onClick={() => { setValue(data?.label || 'action'); setCredit(data?.creditAccount||''); setDebit(data?.debitAccount||''); setEditing(false); }}>Cancel</button>
+            <div className="flex gap-1 pt-1">
+              <button className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 text-white" onClick={commit}>Save</button>
+              <button className="text-[10px] px-2 py-1 rounded bg-neutral-300 hover:bg-neutral-200" onClick={() => { setValue(data?.label || 'action'); setCredit(data?.creditAccount||''); setDebit(data?.debitAccount||''); setEditing(false); }}>Cancel</button>
             </div>
           </div>
         ) : (
           <div>
-            <div>{value || 'action'}</div>
-            {(credit || debit) && (<div style={{ opacity:.7 }}>{credit && `Cr: ${credit}`} {debit && `Db: ${debit}`}</div>)}
+            <div className="font-medium text-neutral-800">{value || 'action'}</div>
+            {(credit || debit) && (<div className="opacity-70">{credit && `Cr: ${credit}`} {debit && `Db: ${debit}`}</div>)}
           </div>
         )}
       </div>
@@ -118,21 +126,21 @@ export const ActionNode: React.FC<NodeProps> = ({ id, data, selected }) => {
         onMouseLeave={() => setShowHandleMenu(false)}
       />
       {showHandleMenu && (
-        <div style={{ position:'absolute', left:'50%', bottom:-4, transform:'translate(-50%, 100%)', background:'#fff', border:'1px solid #3b82f6', borderRadius:4, padding:4, display:'flex', flexDirection:'row', gap:4, zIndex:20, boxShadow:'0 2px 4px rgba(0,0,0,.15)' }}
+        <div className="absolute left-1/2 -bottom-1 translate-x-[-50%] translate-y-full bg-white border border-sky-600 rounded p-1 flex flex-row gap-1 z-20 shadow"
              onMouseEnter={() => setShowHandleMenu('b')}
              onMouseLeave={() => setShowHandleMenu(false)}>
-          <button style={{ fontSize: 10 }} onClick={createAndConnect}>+ New</button>
-          <button style={{ fontSize: 10 }} onClick={connectToExisting}>Link</button>
+          <button className="text-[10px] px-1.5 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white" onClick={createAndConnect}>+ New</button>
+          <button className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-200 hover:bg-neutral-300" onClick={connectToExisting}>Link</button>
         </div>
       )}
       {data?.conflict && showConflictTip && (
-        <div style={{ position:'absolute', top:-4, right:-4, transform:'translate(100%, -100%)', background:'#111', color:'#fff', padding:'6px 8px', fontSize:10, borderRadius:4, maxWidth:200, zIndex:30, boxShadow:'0 2px 6px rgba(0,0,0,.35)' }}
+        <div className="absolute -top-1 -right-1 translate-x-full -translate-y-full bg-neutral-900 text-white px-2 py-1 text-[10px] rounded max-w-[200px] z-30 shadow-lg"
              onMouseEnter={showConflict}
              onMouseLeave={scheduleHideConflict}>
-          <div style={{ fontWeight:600, marginBottom:4 }}>Name conflict</div>
-          <div style={{ lineHeight:1.3 }}>This node name duplicates the first node in this path.</div>
+          <div className="font-semibold mb-1">Name conflict</div>
+          <div className="leading-tight">This node name duplicates the first node in this path.</div>
           {data?.conflictPrimaryId && (
-            <button style={{ marginTop:6, fontSize:10, background:'#d1d5db', color:'#374151', border:'1px solid #cbd5e1', padding:'3px 6px', borderRadius:3, cursor:'pointer' }}
+            <button className="mt-1.5 text-[10px] bg-neutral-300 text-neutral-700 border border-neutral-300 hover:bg-neutral-200 px-2 py-0.5 rounded cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 const primaryId = data.conflictPrimaryId;
@@ -160,24 +168,73 @@ export const nodeTypes = {
   action: ActionNode,
   subflow: ({ id, data, selected }: NodeProps) => {
     const reactFlow = useReactFlow();
-    const [title, setTitle] = useState<string>(data?.title || 'Subflow');
-    const [editing, setEditing] = useState(false);
-    const inputRef = useRef<HTMLInputElement|null>(null);
-    useEffect(()=>{ if(editing && inputRef.current){ inputRef.current.focus(); inputRef.current.select(); } },[editing]);
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState<string>(data?.title || 'Subflow');
+  const [paymentStatus, setPaymentStatus] = useState<string>(data?.paymentStatus || 'Scheduled');
+  const [acquirer, setAcquirer] = useState<string>(data?.acquirer || '');
+    const titleRef = useRef<HTMLInputElement|null>(null);
+    const acquirerRef = useRef<HTMLInputElement|null>(null);
+    useEffect(()=>{ if(editing && titleRef.current){ titleRef.current.focus(); titleRef.current.select(); } },[editing]);
+    // Hide / show child nodes while editing for clarity
+    useEffect(()=>{
+      reactFlow.setNodes(ns => ns.map(n => {
+        if (n.parentNode === id) {
+          const style = { ...(n.style||{}) };
+          if (editing) {
+            style.opacity = 0;
+            style.pointerEvents = 'none';
+          } else {
+            if (style.opacity === 0) delete style.opacity;
+            if (style.pointerEvents === 'none') delete style.pointerEvents;
+          }
+          return { ...n, style };
+        }
+        return n;
+      }));
+    }, [editing, id, reactFlow]);
     const commit = () => {
       setEditing(false);
-      reactFlow.setNodes(ns => ns.map(n => n.id===id ? { ...n, data: { ...n.data, title } } : n));
+      reactFlow.setNodes(ns => ns.map(n => n.id===id ? { ...n, data: { ...n.data, title, paymentStatus, acquirer } } : n));
+    };
+    const cancel = () => {
+      setTitle(data?.title || 'Subflow');
+      setPaymentStatus(data?.paymentStatus || 'Scheduled');
+      setAcquirer(data?.acquirer || '');
+      setEditing(false);
     };
     const highlighted = data?.highlighted;
     const conflict = data?.conflict;
     return (
-  <div style={{ width: '100%', height: '100%', position:'relative', pointerEvents:'auto', /* keep static border from style; no dynamic highlight */ background: conflict ? 'rgba(243,244,246,0.65)' : (highlighted ? 'rgba(187,247,208,0.45)' : undefined), transition:'background-color 150ms ease, opacity 150ms ease', opacity: conflict ? 0.9 : 1 }} onDoubleClick={()=>setEditing(true)}>
+      <div
+        className={[
+          'w-full h-full relative pointer-events-auto text-[12px] rounded-sm',
+          conflict ? 'bg-neutral-100/65 opacity-90' : (highlighted ? 'bg-green-200/45' : '')
+        ].join(' ')}
+        onDoubleClick={()=>setEditing(true)}
+      >
         {editing ? (
-          <input ref={inputRef} value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape'){ setTitle(data?.title||'Subflow'); setEditing(false);} }} onBlur={commit} style={{ fontSize:12, width:'100%', boxSizing:'border-box' }}/>
+          <div className="flex flex-col gap-1 text-[12px]">
+            <input ref={titleRef} value={title} placeholder="Title" onChange={e=>setTitle(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') cancel(); }} className="text-[12px] w-full px-1 py-0.5 border rounded" />
+            <select value={paymentStatus} onChange={e=>setPaymentStatus(e.target.value)} className="text-[12px] px-1 py-0.5 border rounded">
+              <option value="Scheduled">Scheduled</option>
+              <option value="Canceled">Canceled</option>
+              <option value="Completed">Completed</option>
+            </select>
+            <input ref={acquirerRef} value={acquirer} placeholder="Acquirer" onChange={e=>setAcquirer(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') commit(); if(e.key==='Escape') cancel(); }} className="text-[12px] w-full px-1 py-0.5 border rounded" />
+            <div className="flex gap-2 pt-1">
+              <button className="text-[10px] px-2 py-1 rounded bg-green-600 hover:bg-green-500 text-white" onClick={commit}>Save</button>
+              <button className="text-[10px] px-2 py-1 rounded bg-neutral-300 hover:bg-neutral-200" onClick={cancel}>Cancel</button>
+            </div>
+            <div className="text-[10px] opacity-60">esc to cancel • enter to save</div>
+          </div>
         ) : (
-          <div style={{ fontWeight:600, fontSize:12 }}>{title}</div>
+          <div className="text-[12px]">
+            <div className="font-semibold">{title}</div>
+            <div className="opacity-75 mt-0.5">Status: {data?.paymentStatus || paymentStatus}</div>
+            {(data?.acquirer || acquirer) && (<div className="opacity-75">Acquirer: {data?.acquirer || acquirer}</div>)}
+            <div className="absolute top-1 right-1 text-[10px] opacity-60">double-click to edit</div>
+          </div>
         )}
-        <div style={{ position:'absolute', top:4, right:6, fontSize:10, opacity:.6 }}>double-click to edit</div>
       </div>
     );
   }

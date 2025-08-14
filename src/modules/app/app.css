@@ -1,3 +1,0 @@
-.app-root { display:flex; flex-direction:column; height:100%; }
-.app-header { padding:8px 16px; background:#222; color:#fff; font-weight:600; }
-.app-body { flex:1; display:flex; min-height:0; }

@@ -1,6 +1,4 @@
-.flow-container { flex:1; height:100%; position:relative; }
-.flow-container .toolbar { position:absolute; z-index:10; top:8px; left:8px; background:#fff; padding:4px 8px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,.15); display:flex; gap:8px; }
-.flow-container button { cursor:pointer; }
+/* Container & toolbar styles migrated to Tailwind utility classes in FlowEditor.tsx */
 .node-details { position:absolute; top:60px; right:8px; width:220px; background:#fff; padding:8px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,.15); font-size:12px; display:flex; flex-direction:column; gap:6px; }
 .node-details input, .node-details select { width:100%; box-sizing:border-box; }
 

@@ -8,7 +8,14 @@ export const DragAndDropPanel: React.FC<{ selectedSubflowId?: string }> = ({ sel
 
   const addSubflow = () => {
     const id = uuid();
-  reactFlow.addNodes({ id, type: 'subflow', className: 'subflow-node', position: { x: 50, y: 50 }, data: { title: `Subflow ${id.slice(0,4)}` }, style: { width: 400, height: 300, padding: 10, background: 'rgba(243,244,246,0.55)', border: '2px solid #6366f1', borderRadius: 8, overflow: 'visible', zIndex: 0 } });
+    reactFlow.addNodes({
+      id,
+      type: 'subflow',
+      className: 'subflow-node',
+      position: { x: 50, y: 50 },
+      data: { title: `Subflow ${id.slice(0,4)}`, paymentStatus: 'Scheduled', acquirer: '' },
+      style: { width: 400, height: 300, padding: 10, background: 'rgba(243,244,246,0.55)', border: '2px solid #6366f1', borderRadius: 8, overflow: 'visible', zIndex: 0 }
+    });
   };
 
   const addActionNode = () => {

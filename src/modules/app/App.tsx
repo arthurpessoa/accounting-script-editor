@@ -1,12 +1,11 @@
 import React from 'react';
 import { FlowEditor } from '../flow/FlowEditor';
-import './app.css';
 
 export const App: React.FC = () => {
   return (
-    <div className="app-root">
-      <header className="app-header">Accounting Script Flow</header>
-      <div className="app-body">
+    <div className="flex flex-col h-full">
+      <header className="px-4 py-2 bg-neutral-900 text-white font-semibold tracking-wide text-sm">Accounting Script Flow</header>
+      <div className="flex-1 flex min-h-0">
         <FlowEditor />
       </div>
     </div>
