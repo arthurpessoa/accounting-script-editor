@@ -84,7 +84,7 @@ export const ActionNode: React.FC<NodeProps> = ({ id, data, selected }) => {
       onMouseEnter={showConflict}
       onMouseLeave={hideConflictSoon}
     >
-      <strong className="font-semibold text-[11px] uppercase tracking-wide text-neutral-600">Action</strong>
+      <strong className="font-semibold text-[11px] uppercase tracking-wide text-neutral-600">Movimentação</strong>
       <div className="flex flex-col gap-1 mt-1">
         {editing ? (
           <div className="flex flex-col gap-1">
