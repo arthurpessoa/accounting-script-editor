@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+/* Existing global overrides */
+html, body, #root { height:100%; }
+body { font-family: system-ui, Arial, sans-serif; }

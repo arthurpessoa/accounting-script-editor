@@ -1,271 +1,273 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, addEdge, Connection, Edge, Node, OnConnect, useEdgesState, useNodesState, OnSelectionChangeParams, Position } from 'reactflow';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ReactFlow, { Background, Connection, Controls, Edge, MiniMap, Node, OnConnect, OnSelectionChangeParams, Position, useEdgesState, useNodesState } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useScriptStore } from './store';
-import { nodeTypes } from './nodes';
-import './flow.css';
 import { DragAndDropPanel } from './DragAndDropPanel';
+import './flow.css';
+import { nodeTypes } from './Nodes';
+import { LAYOUT } from './LayoutConfig';
 
-// Legacy script object removed; we just manage nodes/edges in component state.
+// --- Helpers ---------------------------------------------------------------
+
+function ensurePaymentRoot(nodes: Node[]): Node[] {
+  if (nodes.some(n => n.type === 'payment')) return nodes;
+  const root: Node = {
+    id: 'payment-root',
+    type: 'payment',
+    position: { ...LAYOUT.paymentRoot },
+    data: {},
+    draggable: true,
+    sourcePosition: Position.Bottom,
+    selectable: false,
+  } as any;
+  return [root, ...nodes];
+}
+
+interface FlowEnds { sf: Node; head: Node; tail: Node }
+
+function computeAutoEdges(nodes: Node[], existing: Edge[]): Edge[] {
+  const paymentNode = nodes.find(n => n.type === 'payment');
+  if (!paymentNode) return existing;
+  const preserved = existing.filter(e => e.source !== paymentNode.id && !e.data?.autoChain);
+  const subflows = nodes.filter(n => n.type === 'subflow');
+  const matchedEnds: FlowEnds[] = [];
+  subflows.forEach(sf => {
+    if (!sf.data?.searchMatch) return;
+    const actions = nodes.filter(n => n.parentNode === sf.id && n.type === 'action');
+    if (!actions.length) return;
+    const ids = new Set(actions.map(a => a.id));
+    const incoming: Record<string, number> = {}; const outgoing: Record<string, number> = {};
+    actions.forEach(a => { incoming[a.id] = 0; outgoing[a.id] = 0; });
+    existing.forEach(e => { if (ids.has(e.source) && ids.has(e.target)) { outgoing[e.source]++; incoming[e.target]++; } });
+    let head = actions.find(a => (incoming[a.id] || 0) === 0) || actions.slice().sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)[0];
+    let tail = actions.find(a => (outgoing[a.id] || 0) === 0) || actions.slice().sort((a, b) => b.position.y - a.position.y || b.position.x - a.position.x)[0];
+    matchedEnds.push({ sf, head, tail });
+  });
+  matchedEnds.sort((a, b) => (a.sf.position.y - b.sf.position.y) || (a.sf.position.x - b.sf.position.x));
+  const auto: Edge[] = [];
+  if (matchedEnds.length) {
+    const { head } = matchedEnds[0];
+    auto.push({ id: `${paymentNode.id}-${head.id}`, source: paymentNode.id, target: head.id, animated: true, data: { autoChain: true, kind: 'payment' } });
+  }
+  for (let i = 0; i < matchedEnds.length - 1; i++) {
+    const tail = matchedEnds[i].tail; const nextHead = matchedEnds[i + 1].head;
+    const tailHasOutgoing = preserved.some(e => e.source === tail.id) || auto.some(e => e.source === tail.id);
+    if (tailHasOutgoing) continue;
+    auto.push({ id: `${tail.id}-${nextHead.id}`, source: tail.id, target: nextHead.id, animated: true, data: { autoChain: true, kind: 'chain' } });
+  }
+  return [...preserved, ...auto];
+}
+
+function layoutSubflows(nodes: Node[], previousIds: string[]): Node[] | null {
+  const subflows = nodes.filter(n => n.type === 'subflow');
+  const ids = subflows.map(s => s.id).sort();
+  const changed = ids.length !== previousIds.length || ids.some((id, i) => id !== previousIds[i]);
+  if (!changed) return null;
+  const { marginX, marginY, gapX, gapY } = LAYOUT.subflowGrid;
+  const viewportWidth = window.innerWidth || 1200;
+  const widths = subflows.map(sf => (sf.style?.width as number) || (LAYOUT.subflowSize.minWidth + 100));
+  const heights = subflows.map(sf => (sf.style?.height as number) || (LAYOUT.subflowSize.minHeight + 100));
+  const cellW = Math.max(...widths, LAYOUT.subflowSize.minWidth + 100);
+  const cellH = Math.max(...heights, LAYOUT.subflowSize.minHeight + 100);
+  const usableWidth = Math.max(LAYOUT.subflowSize.minWidth + 100, viewportWidth - marginX * 2);
+  const cols = Math.max(1, Math.floor((usableWidth + gapX) / (cellW + gapX)));
+  const ordered = subflows.slice().sort((a, b) => (a.position.y - b.position.y) || (a.position.x - b.position.x) || a.id.localeCompare(b.id));
+  const next = nodes.map(n => ({ ...n }));
+  ordered.forEach((sf, idx) => {
+    const col = idx % cols; const row = Math.floor(idx / cols);
+    const totalRowWidth = cols * cellW + (cols - 1) * gapX;
+    const offsetX = Math.max(0, (usableWidth - (totalRowWidth - gapX)) / 2);
+    const x = marginX + offsetX + col * (cellW + gapX);
+    const y = marginY + row * (cellH + gapY);
+    const i = next.findIndex(n => n.id === sf.id);
+    if (i >= 0 && (Math.abs(next[i].position.x - x) > 1 || Math.abs(next[i].position.y - y) > 1)) {
+      next[i] = { ...next[i], position: { x, y } } as any;
+    }
+  });
+  return next;
+}
+
+function resizeSubflows(nodes: Node[]): Node[] | null {
+  const { padding, minWidth, minHeight } = LAYOUT.subflowSize as any; // keep naming consistent even if keys differ
+  let changed = false;
+  const next = nodes.map(n => ({ ...n }));
+  const subflows = nodes.filter(n => n.type === 'subflow');
+  subflows.forEach(sf => {
+    const children = nodes.filter(c => c.parentNode === sf.id && c.type !== 'subflow');
+    if (!children.length) return;
+    let maxX = 0, maxY = 0;
+    children.forEach(c => {
+      const cw = (c.width ?? 140); const ch = (c.height ?? 70);
+      maxX = Math.max(maxX, c.position.x + cw);
+      maxY = Math.max(maxY, c.position.y + ch);
+    });
+    const neededW = Math.max(minWidth, maxX + padding);
+    const neededH = Math.max(minHeight, maxY + padding);
+    const i = next.findIndex(n => n.id === sf.id);
+    if (i >= 0) {
+      const style = { ...(next[i].style || {}) };
+      if (style.width !== neededW || style.height !== neededH) {
+        style.width = neededW; style.height = neededH; if (style.transition) delete style.transition; changed = true;
+        next[i] = { ...next[i], style } as any;
+      }
+    }
+  });
+  return changed ? next : null;
+}
+
+function layoutActions(nodes: Node[], edges: Edge[]): Node[] | null {
+  let anyChange = false;
+  const next = nodes.map(n => ({ ...n }));
+  const subflows = nodes.filter(n => n.type === 'subflow');
+  const { nodeWidth: nodeW, gapX, gapY, innerPaddingX, startY } = LAYOUT.actionLayout as any;
+  subflows.forEach(sf => {
+    const width = (sf.style?.width as number) || (LAYOUT.subflowSize.minWidth + 100);
+    const actions = nodes.filter(n => n.parentNode === sf.id && n.type === 'action');
+    if (!actions.length) return;
+    const ids = new Set(actions.map(a => a.id));
+    const inside = edges.filter(e => ids.has(e.source) && ids.has(e.target));
+    const incoming: Record<string, number> = {}; actions.forEach(a => incoming[a.id] = 0); inside.forEach(e => { incoming[e.target] = (incoming[e.target] || 0) + 1; });
+    const heads = actions.filter(a => (incoming[a.id] || 0) === 0);
+    let ordered: Node[] = [];
+    if (heads.length === 1) {
+      let cur = heads[0].id; const visited = new Set<string>(); const safety = actions.length + 5;
+      while (cur && !visited.has(cur) && visited.size < safety) {
+        visited.add(cur);
+        const node = actions.find(a => a.id === cur); if (node) ordered.push(node);
+        const nextEdge = inside.find(e => e.source === cur); cur = nextEdge?.target || '';
+      }
+      if (ordered.length !== actions.length) ordered = actions.slice().sort((a, b) => a.position.y - b.position.y);
+    } else {
+      ordered = actions.slice().sort((a, b) => a.position.y - b.position.y);
+    }
+    const usableWidth = width - innerPaddingX * 2;
+    const columns = Math.max(1, Math.floor((usableWidth + gapX) / (nodeW + gapX)));
+    ordered.forEach((node, idx) => {
+      const col = idx % columns; const row = Math.floor(idx / columns);
+      const totalRowWidth = columns * nodeW + (columns - 1) * gapX;
+      const offsetX = (width - totalRowWidth) / 2;
+      const x = offsetX + col * (nodeW + gapX); const y = startY + row * gapY;
+      const i = next.findIndex(n => n.id === node.id);
+      if (i >= 0 && (Math.abs(next[i].position.x - x) > 1 || Math.abs(next[i].position.y - y) > 1)) { next[i] = { ...next[i], position: { x, y } } as any; anyChange = true; }
+    });
+  });
+  return anyChange ? next : null;
+}
+
+function highlightSelection(nodes: Node[], edges: Edge[], selected?: Node): Node[] | null {
+  if (!selected) {
+    let changed = false; const cleared = nodes.map(n => {
+      if (n.data?.highlighted || n.data?.conflict) { changed = true; return { ...n, data: { ...n.data, highlighted: false, conflict: false, conflictPrimary: false, conflictPrimaryId: undefined } }; }
+      return n;
+    });
+    return changed ? cleared : null;
+  }
+  const ns = nodes;
+  let containerId: string | undefined = (selected as any).type === 'subflow' ? selected.id : (selected as any).parentNode;
+  let originId: string | undefined;
+  if (containerId) {
+    const children = ns.filter(n => n.parentNode === containerId && n.type === 'action');
+    if (children.length) {
+      const ids = new Set(children.map(c => c.id));
+      const incoming: Record<string, number> = {}; children.forEach(c => incoming[c.id] = 0);
+      edges.forEach(e => { if (ids.has(e.target) && ids.has(e.source)) incoming[e.target] = (incoming[e.target] || 0) + 1; });
+      const heads = children.filter(c => (incoming[c.id] || 0) === 0);
+      if (heads.length === 1) originId = heads[0].id; else if (heads.length > 1) originId = heads.slice().sort((a, b) => a.position.y - b.position.y)[0].id; else originId = children.slice().sort((a, b) => a.position.y - b.position.y)[0].id;
+    }
+  }
+  if (!originId && (selected as any).type === 'action') originId = selected.id;
+  if (!originId) return null;
+  const visited = new Set<string>(); let upstream = originId;
+  while (true) { if (visited.has(upstream)) break; visited.add(upstream); const inc = edges.filter(e => e.target === upstream); if (inc.length !== 1) break; const nextUp = inc[0].source; if (!ns.some(n => n.id === nextUp)) break; upstream = nextUp; }
+  originId = upstream;
+  const reachable = new Set<string>(); const stack = [originId];
+  while (stack.length) { const cur = stack.pop()!; if (!reachable.has(cur)) { reachable.add(cur); edges.filter(e => e.source === cur).forEach(e => stack.push(e.target)); } }
+  const pathSet = reachable;
+  const nameFreq: Record<string, number> = {}; const firstNameId: Record<string, string> = {};
+  ns.forEach(n => { if (!pathSet.has(n.id) || n.type !== 'action') return; const name = (n.data?.name || '').trim(); if (name) nameFreq[name] = (nameFreq[name] || 0) + 1; });
+  Array.from(pathSet).forEach(id => { const node = ns.find(n => n.id === id); if (!node || node.type !== 'action') return; const name = (node.data?.name || '').trim(); if (!name) return; if (!firstNameId[name]) firstNameId[name] = node.id; });
+  let changed = false;
+  const next = ns.map(n => {
+    const highlighted = pathSet.has(n.id) && n.type !== 'subflow';
+    const name = (n.data?.name || '').trim(); const hasDup = highlighted && !!name && nameFreq[name] > 1; const conflictPrimary = hasDup && firstNameId[name] === n.id; const conflict = hasDup && !conflictPrimary;
+    const need = highlighted !== (n.data?.highlighted || false) || conflict !== (n.data?.conflict || false) || conflictPrimary !== (n.data?.conflictPrimary || false) || (n.data?.conflictPrimaryId || '') !== (hasDup ? firstNameId[name] : '');
+    if (need) { changed = true; return { ...n, data: { ...n.data, highlighted, conflict, conflictPrimary, conflictPrimaryId: hasDup ? firstNameId[name] : undefined } }; }
+    return n;
+  });
+  return changed ? next : null;
+}
 
 export const FlowEditor: React.FC = () => {
-  const { setNodesJson } = useScriptStore();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selected, setSelected] = useState<Node | undefined>();
+  const lastSubflowIdsRef = useRef<string[]>([]);
+  // Ensure payment root exists once at mount & whenever nodes array empties
+  useEffect(() => { setNodes(ns => ensurePaymentRoot(ns)); }, [setNodes]);
 
-  // Enforce handle positions (top target, bottom source) for vertical flow
+  // Sync auto edges & apply conflict highlighting (fallback to payment's first matched head when nothing selected)
   useEffect(() => {
-    setNodes(ns => ns.map(n => ({ ...n, sourcePosition: Position.Bottom, targetPosition: Position.Top })));
-  }, [setNodes]);
-
-  // Ensure subflow styling stays transparent enough for edges to be visible
-  useEffect(() => {
-    setNodes(ns => ns.map(n => {
-      if (n.type === 'subflow') {
-        const style = { ...(n.style || {}) };
-        // Only override background if it's fully opaque default we previously set
-        if (!style.background || style.background === '#f3f4f6') {
-          style.background = 'rgba(243,244,246,0.55)';
+    setEdges(prev => {
+      const newEdges = computeAutoEdges(nodes as any, prev);
+      setNodes(ns => {
+        const payment = ns.find(n => n.type === 'payment');
+        let headNode: Node | undefined;
+        if (payment) {
+          const headEdge = newEdges.find(e => e.source === payment.id && e.data?.kind === 'payment');
+          if (headEdge) headNode = ns.find(n => n.id === headEdge.target);
         }
-        style.zIndex = 0;
-        style.overflow = 'visible';
-        const className = n.className && n.className.includes('subflow-node') ? n.className : ((n.className ? n.className + ' ' : '') + 'subflow-node');
-        return { ...n, style, className };
-      }
-      return n;
-    }));
-  }, [setNodes]);
-
-  // Auto-resize subflows to fit contained action nodes (responsive container)
-  useEffect(() => {
-    const PADDING = 30;
-    const MIN_W = 300;
-    const MIN_H = 200;
-    let changed = false;
-    setNodes(current => {
-      const subflows = current.filter(n => n.type === 'subflow');
-      if (!subflows.length) return current;
-      const next = current.map(n => ({ ...n }));
-      for (const sf of subflows) {
-        const children = current.filter(c => c.parentNode === sf.id && c.type !== 'subflow');
-        if (!children.length) continue;
-        let maxX = 0, maxY = 0;
-        for (const c of children) {
-          const cw = (c.width ?? 140); // fallback guess
-          const ch = (c.height ?? 70);
-          const cx = c.position.x;
-          const cy = c.position.y;
-          maxX = Math.max(maxX, cx + cw);
-          maxY = Math.max(maxY, cy + ch);
-        }
-        const neededW = Math.max(MIN_W, maxX + PADDING);
-        const neededH = Math.max(MIN_H, maxY + PADDING);
-        const idx = next.findIndex(n => n.id === sf.id);
-        if (idx >= 0) {
-          const style = { ...(next[idx].style || {}) };
-          if (style.width !== neededW || style.height !== neededH) {
-            style.width = neededW;
-            style.height = neededH;
-            // No transition to avoid perceived animation while resizing
-            if (style.transition) delete style.transition;
-            next[idx] = { ...next[idx], style };
-            changed = true;
-          }
-        }
-      }
-      return changed ? next : current;
+        const selectionRef = selected ? ns.find(n => n.id === selected.id) : headNode;
+        const updated = highlightSelection(ns, newEdges, selectionRef as any);
+        return updated || ns;
+      });
+      return newEdges;
     });
-  }, [nodes, setNodes]);
+  }, [nodes, selected, setEdges, setNodes]);
 
-  // Auto-layout: arrange action nodes inside each subflow; prefer chain order, then responsive multi-column grid.
+  // Auto-layout subflows on add/remove
+  useEffect(() => {
+  }, [nodes]);
+
+  // Structural & style normalizations + resize + internal action layout
   useEffect(() => {
     setNodes(current => {
-      const subflows = current.filter(n => n.type === 'subflow');
-      if (!subflows.length) return current;
-      const edgeList = edges; // capture closure
-      let anyChange = false;
-      const updated = current.map(n => n); // shallow copy references first
-      for (const sf of subflows) {
-        const width = (sf.style?.width as number) || 400;
-        const children = current.filter(c => c.parentNode === sf.id && c.type === 'action');
-        if (!children.length) continue;
-        const childIds = new Set(children.map(c => c.id));
-        const insideEdges = edgeList.filter(e => childIds.has(e.source) && childIds.has(e.target));
-        // Build chain order: find heads (no incoming inside)
-        const incomingCount: Record<string, number> = {};
-        children.forEach(c => incomingCount[c.id] = 0);
-        insideEdges.forEach(e => { incomingCount[e.target] = (incomingCount[e.target] || 0) + 1; });
-        const heads = children.filter(c => (incomingCount[c.id] || 0) === 0);
-        let ordered: typeof children = [];
-        if (heads.length === 1) {
-          // traverse
-          let currentId = heads[0].id;
-          const safety = children.length + 5;
-          let steps = 0;
-          const visited = new Set<string>();
-          while (currentId && steps < safety && !visited.has(currentId)) {
-            steps++;
-            visited.add(currentId);
-            const node = children.find(c => c.id === currentId);
-            if (node) ordered.push(node);
-            const nextEdge = insideEdges.find(e => e.source === currentId);
-            currentId = nextEdge?.target || '';
-          }
-          if (ordered.length !== children.length) {
-            // fallback to y sort
-            ordered = children.slice().sort((a, b) => a.position.y - b.position.y);
-          }
-        } else {
-          ordered = children.slice().sort((a, b) => a.position.y - b.position.y);
-        }
-        // Responsive grid parameters
-        const nodeW = 160;
-        const nodeH = 70;
-        const gapX = 40;
-        const gapY = 90;
-        const innerPaddingX = 40;
-        const startY = 140;
-        const usableWidth = width - innerPaddingX * 2;
-        const columns = Math.max(1, Math.floor((usableWidth + gapX) / (nodeW + gapX)));
-        ordered.forEach((node, idx) => {
-          const col = idx % columns;
-          const row = Math.floor(idx / columns);
-          const totalRowWidth = columns * nodeW + (columns - 1) * gapX;
-          const offsetX = (width - totalRowWidth) / 2; // center grid
-          const desiredX = offsetX + col * (nodeW + gapX);
-          const desiredY = startY + row * gapY;
-          const i = updated.findIndex(n => n.id === node.id);
-          if (i >= 0) {
-            const orig = updated[i];
-            if (Math.abs(orig.position.x - desiredX) > 1 || Math.abs(orig.position.y - desiredY) > 1) {
-              updated[i] = { ...orig, position: { x: desiredX, y: desiredY } };
-              anyChange = true;
-            }
-          }
-        });
-      }
-      return anyChange ? updated : current;
-    });
-  }, [nodes, edges, setNodes]);
-
-  // Highlight: start from the global head of the linear chain that the selection belongs to (ascend across subflows)
-  useEffect(() => {
-    setNodes(ns => {
-      if (!selected) {
-        let changed = false;
-        const cleared = ns.map(n => {
-          if (n.data?.highlighted || n.data?.conflict) { changed = true; return { ...n, data: { ...n.data, highlighted: false, conflict: false } }; }
-          return n;
-        });
-        return changed ? cleared : ns;
-      }
-      // Determine an initial origin inside the selected subflow (or the action itself)
-      let containerId: string | undefined = (selected as any).type === 'subflow' ? selected.id : (selected as any).parentNode;
-      if (!containerId && (selected as any).type === 'action') containerId = (selected as any).parentNode; // could be undefined (no subflow)
-      let originId: string | undefined;
-      if (containerId) {
-        const children = ns.filter(n => n.parentNode === containerId && n.type === 'action');
-        if (children.length) {
-          const childIds = new Set(children.map(c => c.id));
-          const incomingCounts: Record<string, number> = {};
-          children.forEach(c => incomingCounts[c.id] = 0);
-          edges.forEach(e => { if (childIds.has(e.target) && childIds.has(e.source)) incomingCounts[e.target] = (incomingCounts[e.target] || 0) + 1; });
-          const heads = children.filter(c => (incomingCounts[c.id] || 0) === 0);
-          if (heads.length === 1) originId = heads[0].id; else if (heads.length > 1) originId = heads.slice().sort((a, b) => a.position.y - b.position.y)[0].id; else originId = children.slice().sort((a, b) => a.position.y - b.position.y)[0].id;
-        }
-      }
-      if (!originId && (selected as any).type === 'action') originId = selected.id;
-      if (!originId) {
-        // Nothing to highlight
-        let changed = false;
-        const cleared = ns.map(n => {
-          if (n.data?.highlighted || n.data?.conflict) { changed = true; return { ...n, data: { ...n.data, highlighted: false, conflict: false } }; }
-          return n;
-        });
-        return changed ? cleared : ns;
-      }
-      // Ascend upstream across subflows to find global root (stop on no incoming or cycle)
-      const visited = new Set<string>();
-      let upstream = originId;
-      while (true) {
-        if (visited.has(upstream)) break; // cycle guard
-        visited.add(upstream);
-        const incoming = edges.filter(e => e.target === upstream);
-        if (incoming.length !== 1) break; // zero or branching -> stop
-        const nextUp = incoming[0].source;
-        // ensure node exists
-        if (!ns.some(n => n.id === nextUp)) break;
-        upstream = nextUp;
-      }
-      originId = upstream;
-      // Forward traversal from global origin
-      const reachable = new Set<string>();
-      const order: string[] = [];
-      const stack: string[] = [originId];
-      while (stack.length) {
-        const cur = stack.pop()!;
-        if (!reachable.has(cur)) {
-          reachable.add(cur);
-          order.push(cur);
-          edges.filter(e => e.source === cur).forEach(e => { if (!reachable.has(e.target)) stack.push(e.target); });
-        }
-      }
-      const pathSet = new Set<string>([originId, ...reachable]);
-      const nameFreq: Record<string, number> = {};
-      const firstNameId: Record<string, string> = {};
-      ns.forEach(n => {
-        if (!pathSet.has(n.id) || n.type !== 'action') return;
-        const name = (n.data?.name || '').trim();
-        if (name) nameFreq[name] = (nameFreq[name] || 0) + 1;
-      });
-      order.forEach(id => {
-        const node = ns.find(n => n.id === id);
-        if (!node || node.type !== 'action') return;
-        if (!pathSet.has(node.id)) return;
-        const name = (node.data?.name || '').trim();
-        if (!name) return;
-        if (!firstNameId[name]) firstNameId[name] = node.id;
-      });
+      let work = ensurePaymentRoot(current);
+      const relayout = layoutSubflows(work, lastSubflowIdsRef.current); if (relayout) { work = relayout; lastSubflowIdsRef.current = work.filter(n => n.type === 'subflow').map(s => s.id).sort(); }
+      const resized = resizeSubflows(work); if (resized) work = resized;
+      const laidOut = layoutActions(work, edges); if (laidOut) work = laidOut;
+      // enforce handle positions + subflow style
       let changed = false;
-      const next = ns.map(n => {
-        const highlighted = pathSet.has(n.id) && n.type !== 'subflow';
-        const name = (n.data?.name || '').trim();
-        const hasDup = highlighted && !!name && nameFreq[name] > 1;
-        const conflictPrimary = hasDup && firstNameId[name] === n.id;
-        const conflict = hasDup && !conflictPrimary;
-        const needsUpdate = (n.data?.highlighted || false) !== highlighted || (n.data?.conflict || false) !== conflict || (n.data?.conflictPrimary || false) !== conflictPrimary || (n.data?.conflictPrimaryId || '') !== (hasDup ? firstNameId[name] : (n.data?.conflictPrimaryId || ''));
-        if (needsUpdate) { changed = true; return { ...n, data: { ...n.data, highlighted, conflict, conflictPrimary, conflictPrimaryId: hasDup ? firstNameId[name] : undefined } }; }
+      const next = work.map(n => {
+        let mutated = false; const copy: any = { ...n };
+        if (copy.sourcePosition !== Position.Bottom || copy.targetPosition !== Position.Top) { copy.sourcePosition = Position.Bottom; copy.targetPosition = Position.Top; mutated = true; }
+        if (copy.type === 'subflow') {
+          const style = { ...(copy.style || {}) };
+          if (!style.background || style.background === '#f3f4f6') { style.background = 'rgba(243,244,246,0.55)'; mutated = true; }
+          if (style.zIndex !== 0) { style.zIndex = 0; mutated = true; }
+          if (style.overflow !== 'visible') { style.overflow = 'visible'; mutated = true; }
+          if (!copy.className || !copy.className.includes('subflow-node')) { copy.className = ((copy.className ? copy.className + ' ' : '') + 'subflow-node').trim(); mutated = true; }
+          copy.style = style;
+        }
+        if (copy.type === 'action' && copy.data?.label && !copy.data.name) { copy.data = { ...copy.data, name: copy.data.label }; mutated = true; }
+        if (mutated) { changed = true; return copy; }
         return n;
       });
-      return changed ? next : ns;
+      return changed || relayout || resized || laidOut ? next : current;
     });
-  }, [selected, edges, nodes, setNodes]);
+  }, [edges, setNodes, nodes]);
 
-  // Backfill missing name field for legacy nodes so conflict detection works consistently
+  // Highlight recompute if edges change independently (e.g., deletion) and selection exists
   useEffect(() => {
-    setNodes(ns => {
-      let changed = false; const updated = ns.map(n => {
-        if (n.type === 'action' && (!n.data?.name) && n.data?.label) { changed = true; return { ...n, data: { ...n.data, name: n.data.label } }; }
-        return n;
-      });
-      return changed ? updated : ns;
-    });
-  }, [setNodes]);
+    if (!selected) return; // fallback handled in edge sync effect
+    setNodes(ns => { const updated = highlightSelection(ns, edges, selected); return updated || ns; });
+  }, [edges, selected, setNodes]);
 
-  const onConnect: OnConnect = useCallback((params: Edge | Connection) => {
-    setEdges((eds) => {
-      // New rule: allow multiple incoming edges, but only one outgoing per source
-      if (eds.some(e => e.source === params.source)) {
-        return eds; // disallow additional outgoing from the same source
-      }
-      return addEdge({ ...params, animated: true }, eds);
-    });
-  }, [setEdges]);
+  const onConnect: OnConnect = useCallback((_params: Edge | Connection) => {
+    // Manual edge creation disabled; ignore user attempts
+    return;
+  }, []);
 
   const handleExport = () => {
     const json = JSON.stringify({ nodes, edges }, null, 2);
-    setNodesJson(json);
     navigator.clipboard.writeText(json).catch(console.error);
     alert('Graph copied to clipboard');
   };
@@ -274,16 +276,13 @@ export const FlowEditor: React.FC = () => {
     setSelected(params.nodes[0]);
   };
 
-  // Listen for external selection requests (e.g., from conflict tooltip buttons)
+  // External selection events
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail) return;
-      const nodeId: string = typeof detail === 'string' ? detail : detail.nodeId;
-      if (!nodeId) return;
-      setNodes(ns => ns.map(n => ({ ...n, selected: n.id === nodeId })));
-      const found = nodes.find(n => n.id === nodeId);
-      if (found) setSelected(found as Node);
+      const detail = (e as CustomEvent).detail; if (!detail) return;
+      const nodeId: string = typeof detail === 'string' ? detail : detail.nodeId; if (!nodeId) return;
+      setNodes(ns => ns.map(n => n.id === nodeId ? { ...n, selected: true } : { ...n, selected: false }));
+      const found = nodes.find(n => n.id === nodeId); if (found) setSelected(found as Node);
     };
     window.addEventListener('externalNodeSelect', handler as EventListener);
     return () => window.removeEventListener('externalNodeSelect', handler as EventListener);
@@ -344,24 +343,12 @@ export const FlowEditor: React.FC = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
-        onNodeDragStart={(e, node) => {
-          if (node.type === 'subflow') {
-            setNodes(ns => ns.map(n => n.id === node.id ? { ...n, className: ((n.className || '') + ' subflow-no-transition').trim() } : n));
-            // add no-transition class to children for drag duration
-            setNodes(ns => ns.map(n => n.parentNode === node.id ? { ...n, className: ((n.className || '') + ' node-no-transition').trim() } : n));
-          }
-        }}
-        onNodeDragStop={(e, node) => {
-          if (node.type === 'subflow') {
-            setNodes(ns => ns.map(n => n.id === node.id ? { ...n, className: (n.className || '').replace(/\bsubflow-no-transition\b/g, '').trim() } : n));
-            // remove no-transition from children
-            setNodes(ns => ns.map(n => n.parentNode === node.id ? { ...n, className: (n.className || '').replace(/\bnode-no-transition\b/g, '').trim() } : n));
-          }
-        }}
+        onNodeDragStart={(e, node) => { if (node.type === 'subflow') { setNodes(ns => ns.map(n => { if (n.id === node.id) return { ...n, className: ((n.className || '') + ' subflow-no-transition').trim() }; if (n.parentNode === node.id) return { ...n, className: ((n.className || '') + ' node-no-transition').trim() }; return n; })); } }}
+        onNodeDragStop={(e, node) => { if (node.type === 'subflow') { setNodes(ns => ns.map(n => { if (n.id === node.id) return { ...n, className: (n.className || '').replace(/\bsubflow-no-transition\b/g, '').trim() }; if (n.parentNode === node.id) return { ...n, className: (n.className || '').replace(/\bnode-no-transition\b/g, '').trim() }; return n; })); } }}
         fitView
         nodeTypes={nodeTypes}
       >
-        <DragAndDropPanel selectedSubflowId={selected?.type === 'subflow' ? selected.id : undefined} />
+        <DragAndDropPanel />
         <Background />
         <MiniMap />
         <Controls />
