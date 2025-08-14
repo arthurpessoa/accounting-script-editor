@@ -42,7 +42,9 @@ export const DragAndDropPanel: React.FC = () => {
     }));
     if (first.value) {
       const { x, y, w } = first.value;
-      try { (reactFlow as any).setCenter?.(x + w / 2, y + 40, { zoom: 1, duration: 300 }); } catch {}
+      try { reactFlow.setCenter?.(x + w / 2, y + 40, { zoom: 1, duration: 300 }); } catch (_err) {
+        // ignore viewport centering errors
+      }
     }
   }, [reactFlow, filterStatus, acquirer, title]);
 

@@ -129,7 +129,7 @@ export const ActionNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 if (primaryNode) {
                   const x = (primaryNode.positionAbsolute?.x ?? primaryNode.position.x) + (primaryNode.width ? primaryNode.width/2 : 0);
                   const y = (primaryNode.positionAbsolute?.y ?? primaryNode.position.y) + (primaryNode.height ? primaryNode.height/2 : 0);
-                  try { (rf as any).setCenter?.(x, y, { zoom: 1, duration: 300 }); } catch {}
+                  try { rf.setCenter?.(x, y, { zoom: 1, duration: 300 }); } catch (_err) { /* ignore */ }
                 }
                 window.dispatchEvent(new CustomEvent('externalNodeSelect', { detail: primaryId }));
                 if (hideTimer.current) window.clearTimeout(hideTimer.current);
