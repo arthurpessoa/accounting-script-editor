@@ -216,6 +216,7 @@ export const FlowEditor: React.FC = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selected, setSelected] = useState<Node | undefined>();
   const [paymentDragging, setPaymentDragging] = useState(false);
+  const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; handleType: 'source'|'target' } | null>(null);
   const lastSubflowIdsRef = useRef<string[]>([]);
   // Ensure payment root exists once at mount & whenever nodes array empties
   useEffect(() => { setNodes(ns => ensurePaymentRoot(ns)); }, [setNodes]);
@@ -280,6 +281,75 @@ export const FlowEditor: React.FC = () => {
     if (!selected) return; // fallback handled in edge sync effect
     setNodes(ns => { const updated = highlightSelection(ns, edges, selected); return updated || ns; });
   }, [edges, selected, setNodes]);
+
+  // Annotate action nodes with structural role flags (head / tail) and hasOutgoing
+  useEffect(() => {
+    setNodes(ns => {
+      // Build per-subflow group stats
+      const group: Record<string, { actions: Node[]; incoming: Record<string, number>; outgoing: Record<string, number> }> = {};
+      ns.forEach(n => {
+        if (n.type === 'action' && n.parentNode) {
+          if (!group[n.parentNode]) group[n.parentNode] = { actions: [], incoming: {}, outgoing: {} };
+          group[n.parentNode].actions.push(n);
+        }
+      });
+      Object.values(group).forEach(g => {
+        const idSet = new Set(g.actions.map(a => a.id));
+        g.actions.forEach(a => { g.incoming[a.id] = 0; g.outgoing[a.id] = 0; });
+        edges.forEach(e => { if (idSet.has(e.source) && idSet.has(e.target)) { g.outgoing[e.source]++; g.incoming[e.target]++; } });
+      });
+      let changed = false;
+      const next = ns.map(n => {
+        if (n.type !== 'action') return n;
+        const g = n.parentNode ? group[n.parentNode] : undefined;
+        const hasOutgoing = edges.some(e => e.source === n.id);
+        const isHead = g ? g.incoming[n.id] === 0 : false;
+        const isTail = g ? g.outgoing[n.id] === 0 : !hasOutgoing; // fallback if no group
+        const d: any = n.data || {};
+        if (d.hasOutgoing === hasOutgoing && d.isHead === isHead && d.isTail === isTail) return n;
+        changed = true;
+        return { ...n, data: { ...d, hasOutgoing, isHead, isTail } };
+      });
+      return changed ? next : ns;
+    });
+  }, [edges, setNodes]);
+
+  // Highlight eligible head/tail handles during connection drag
+  useEffect(() => {
+    if (!connectingFrom) {
+      setNodes(ns => ns.map(n => {
+        if (n.type !== 'action') return n;
+        const d: any = n.data || {};
+        if (!d.highlightSourceHandle && !d.highlightTargetHandle) return n;
+        return { ...n, data: { ...d, highlightSourceHandle: false, highlightTargetHandle: false } };
+      }));
+      return;
+    }
+    setNodes(ns => {
+      const origin = ns.find(n => n.id === connectingFrom.nodeId);
+      if (!origin || origin.type !== 'action') return ns;
+      const od: any = origin.data || {};
+      return ns.map(n => {
+        if (n.type !== 'action' || n.id === origin.id || n.parentNode !== origin.parentNode) {
+          const d: any = n.data || {};
+          if (!d.highlightSourceHandle && !d.highlightTargetHandle) return n;
+          return { ...n, data: { ...d, highlightSourceHandle: false, highlightTargetHandle: false } };
+        }
+        const d: any = n.data || {};
+        let highlightSourceHandle = false;
+        let highlightTargetHandle = false;
+        if (od.isTail) {
+          // dragging from tail -> highlight heads' target handles
+            highlightTargetHandle = !!d.isHead;
+        } else if (od.isHead) {
+          // dragging from head -> highlight tails' source handles
+            highlightSourceHandle = !!d.isTail;
+        }
+        if (d.highlightSourceHandle === highlightSourceHandle && d.highlightTargetHandle === highlightTargetHandle) return n;
+        return { ...n, data: { ...d, highlightSourceHandle, highlightTargetHandle } };
+      });
+    });
+  }, [connectingFrom, setNodes]);
 
   const onConnect: OnConnect = useCallback((conn) => {
     const { source, target } = conn;
@@ -366,6 +436,7 @@ export const FlowEditor: React.FC = () => {
       }
       return working; // other connection types ignored
     });
+  setConnectingFrom(null);
     // After node adjustments, handle edge creation for same-subflow action connections.
     setEdges(es => {
       // Only add for same-subflow action->action (we re-evaluate conditions here)
@@ -462,6 +533,8 @@ export const FlowEditor: React.FC = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+  onConnectStart={(e, params) => { if (params?.nodeId && params.handleType) setConnectingFrom({ nodeId: params.nodeId, handleType: params.handleType }); }}
+  onConnectEnd={() => setConnectingFrom(null)}
         onSelectionChange={onSelectionChange}
         onNodeDragStart={(e, node) => {
           if (node.type === 'payment') setPaymentDragging(true);

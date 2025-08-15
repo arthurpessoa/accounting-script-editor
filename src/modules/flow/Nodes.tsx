@@ -103,10 +103,33 @@ export const ActionNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           </div>
         )}
       </div>
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom}
+      <Handle
+        type="target"
+        position={Position.Top}
+        isConnectable
+        style={{
+          background: data?.highlightTargetHandle ? '#f97316' : '#ffffff', // orange for head targets
+          border: data?.highlightTargetHandle ? '2px solid #f97316' : '1px solid #555',
+          width: data?.highlightTargetHandle ? 16 : 10,
+          height: data?.highlightTargetHandle ? 16 : 10,
+          boxShadow: data?.highlightTargetHandle ? '0 0 0 5px rgba(249,115,22,0.40)' : 'none',
+          transition: 'all 120ms'
+        }}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        isConnectable
         onMouseEnter={()=>setShowMenu(true)}
         onMouseLeave={()=>setShowMenu(false)}
+        style={{
+          background: data?.highlightSourceHandle ? '#8b5cf6' : '#ffffff', // purple for tail sources
+          border: data?.highlightSourceHandle ? '2px solid #8b5cf6' : '1px solid #555',
+          width: data?.highlightSourceHandle ? 16 : 10,
+          height: data?.highlightSourceHandle ? 16 : 10,
+          boxShadow: data?.highlightSourceHandle ? '0 0 0 5px rgba(139,92,246,0.40)' : 'none',
+          transition: 'all 120ms'
+        }}
       />
       {showMenu && !editing && (
         <div className="absolute left-1/2 -bottom-1 translate-x-[-50%] translate-y-full bg-white border border-sky-600 rounded p-1 flex gap-1 z-20 shadow"
