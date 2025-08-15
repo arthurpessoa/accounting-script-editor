@@ -48,7 +48,12 @@ function computeAutoEdges(nodes: Node[], existing: Edge[]): Edge[] {
   const tail = actions.find(a => (outgoing[a.id] || 0) === 0) || actions.slice().sort((a, b) => b.position.y - a.position.y || b.position.x - a.position.x)[0];
     matchedEnds.push({ sf, head, tail });
   });
-  matchedEnds.sort((a, b) => (a.sf.position.y - b.sf.position.y) || (a.sf.position.x - b.sf.position.x));
+  matchedEnds.sort((a, b) => {
+    const pa = typeof a.sf.data?.priority === 'number' ? a.sf.data.priority : Number.MAX_SAFE_INTEGER;
+    const pb = typeof b.sf.data?.priority === 'number' ? b.sf.data.priority : Number.MAX_SAFE_INTEGER;
+    if (pa !== pb) return pa - pb; // ascending: smaller priority first
+    return (a.sf.position.y - b.sf.position.y) || (a.sf.position.x - b.sf.position.x);
+  });
   const auto: Edge[] = [];
   if (matchedEnds.length) {
     const { head } = matchedEnds[0];
@@ -276,9 +281,42 @@ export const FlowEditor: React.FC = () => {
     setNodes(ns => { const updated = highlightSelection(ns, edges, selected); return updated || ns; });
   }, [edges, selected, setNodes]);
 
-  const onConnect: OnConnect = useCallback(() => {
-    // Manual edge creation disabled
-  }, []);
+  const onConnect: OnConnect = useCallback((conn) => {
+    // We interpret a manual connection from payment-root -> action head
+    // as a request to move that action's subflow to the first position (swap priorities).
+    const { source, target } = conn;
+    if (!source || !target) return;
+    setNodes(ns => {
+      const payment = ns.find(n => n.type === 'payment');
+      if (!payment || source !== payment.id) return ns; // only handle payment-root sourced connects for now
+      const targetNode = ns.find(n => n.id === target);
+      if (!targetNode) return ns;
+      const targetSubflowId = (targetNode as any).parentNode;
+      if (!targetSubflowId) return ns;
+      const subflows = ns.filter(n => n.type === 'subflow');
+      if (!subflows.length) return ns;
+      // Find current first (lowest numeric priority)
+      const sortable = subflows.map(sf => {
+        const d: any = sf.data || {};
+        return { id: sf.id, p: typeof d.priority === 'number' ? d.priority : Number.MAX_SAFE_INTEGER };
+      });
+      sortable.sort((a,b)=> a.p - b.p);
+      const first = sortable[0];
+      if (!first || first.id === targetSubflowId) return ns; // already first
+      const targetSf = sortable.find(s => s.id === targetSubflowId);
+      if (!targetSf) return ns;
+      // Swap priority values
+      const pA = first.p;
+      const pB = targetSf.p;
+      return ns.map(n => {
+        if (n.type !== 'subflow') return n;
+        if (n.id === first.id) return { ...n, data: { ...(n.data||{}), priority: pB } };
+        if (n.id === targetSubflowId) return { ...n, data: { ...(n.data||{}), priority: pA } };
+        return n;
+      });
+    });
+    // Do not add a manual edge; auto-edge recomputation will reflect new order.
+  }, [setNodes]);
 
 
   const onSelectionChange = (params: OnSelectionChangeParams) => {

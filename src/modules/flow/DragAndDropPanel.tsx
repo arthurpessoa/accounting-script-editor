@@ -122,12 +122,18 @@ export const DragAndDropPanel: React.FC = () => {
         position = { x: last.position.x + 60, y: Math.max(last.position.y + 60, paymentBottom) };
       }
     }
+    // Determine next ascending priority (start at 0)
+    const maxPriority = existingSubflows.reduce((m, s) => {
+      const p = typeof s.data?.priority === 'number' ? s.data.priority : m;
+      return p > m ? p : m;
+    }, -1);
+    const nextPriority = maxPriority + 1;
     const subflowNode = {
       id,
       type: 'subflow' as const,
       className: 'subflow-node',
       position,
-      data: { title: `Subflow ${id.slice(0,4)}`, paymentStatus: 'Scheduled', acquirer: '' },
+      data: { title: `Subflow ${id.slice(0,4)}`, paymentStatus: 'Scheduled', acquirer: '', priority: nextPriority },
       style: { width, height, padding: 10, background: 'rgba(243,244,246,0.55)', border: '2px solid #6366f1', borderRadius: 8, overflow: 'visible', zIndex: 0 }
     };
     // Automatically add an Empty Action inside the new subflow
