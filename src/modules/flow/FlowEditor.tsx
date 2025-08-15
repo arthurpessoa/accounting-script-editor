@@ -282,41 +282,109 @@ export const FlowEditor: React.FC = () => {
   }, [edges, selected, setNodes]);
 
   const onConnect: OnConnect = useCallback((conn) => {
-    // We interpret a manual connection from payment-root -> action head
-    // as a request to move that action's subflow to the first position (swap priorities).
     const { source, target } = conn;
     if (!source || !target) return;
     setNodes(ns => {
       const payment = ns.find(n => n.type === 'payment');
-      if (!payment || source !== payment.id) return ns; // only handle payment-root sourced connects for now
+      const sourceNode = ns.find(n => n.id === source);
       const targetNode = ns.find(n => n.id === target);
-      if (!targetNode) return ns;
-      const targetSubflowId = (targetNode as any).parentNode;
-      if (!targetSubflowId) return ns;
-      const subflows = ns.filter(n => n.type === 'subflow');
-      if (!subflows.length) return ns;
-      // Find current first (lowest numeric priority)
-      const sortable = subflows.map(sf => {
-        const d: any = sf.data || {};
-        return { id: sf.id, p: typeof d.priority === 'number' ? d.priority : Number.MAX_SAFE_INTEGER };
-      });
-      sortable.sort((a,b)=> a.p - b.p);
-      const first = sortable[0];
-      if (!first || first.id === targetSubflowId) return ns; // already first
-      const targetSf = sortable.find(s => s.id === targetSubflowId);
-      if (!targetSf) return ns;
-      // Swap priority values
-      const pA = first.p;
-      const pB = targetSf.p;
-      return ns.map(n => {
-        if (n.type !== 'subflow') return n;
-        if (n.id === first.id) return { ...n, data: { ...(n.data||{}), priority: pB } };
-        if (n.id === targetSubflowId) return { ...n, data: { ...(n.data||{}), priority: pA } };
-        return n;
-      });
+      if (!sourceNode || !targetNode) return ns;
+      const sourceParent = (sourceNode as any).parentNode;
+      const targetParent = (targetNode as any).parentNode;
+
+      // New Case: action -> action inside SAME subflow: create/replace edge (maintain single outgoing from source)
+      if (sourceNode.type === 'action' && targetNode.type === 'action' && sourceParent && sourceParent === targetParent) {
+        // Edges are handled outside this setNodes call
+        // No priority change needed; just ensure nodes unchanged
+        return ns;
+      }
+      // Helper: normalize priorities to contiguous 0..N-1 (stable by current ordering rules)
+      const normalize = (arr: typeof ns) => {
+        const subs = arr.filter(n => n.type === 'subflow');
+        if (!subs.length) return arr;
+        const ordered = subs.slice().sort((a,b)=> {
+          const pa = typeof (a.data as any)?.priority === 'number' ? (a.data as any).priority : Number.MAX_SAFE_INTEGER;
+          const pb = typeof (b.data as any)?.priority === 'number' ? (b.data as any).priority : Number.MAX_SAFE_INTEGER;
+          if (pa !== pb) return pa - pb;
+          // fallback: vertical then horizontal position
+          const dy = a.position.y - b.position.y; if (dy) return dy;
+          const dx = a.position.x - b.position.x; if (dx) return dx;
+          return a.id.localeCompare(b.id);
+        });
+        return arr.map(n => {
+          if (n.type !== 'subflow') return n;
+          const idx = ordered.findIndex(s => s.id === n.id);
+          if (idx < 0) return n;
+            const currentP = typeof (n.data as any)?.priority === 'number' ? (n.data as any).priority : undefined;
+            if (currentP === idx) return n; // already normalized
+          return { ...n, data: { ...(n.data||{}), priority: idx } };
+        });
+      };
+
+      // Normalize upfront so we work with clean, unique priorities
+      let working = normalize(ns);
+
+      // Case 1: payment-root -> action (move that subflow to first by swapping with current first)
+      if (payment && source === payment.id && targetParent) {
+        const subs = working.filter(n => n.type === 'subflow');
+        if (subs.length < 2) return working; // nothing to swap
+  const ordered = subs.slice().sort((a,b)=> ((a.data as any).priority - (b.data as any).priority));
+        const first = ordered[0];
+        if (first.id === targetParent) return working; // already first
+        const targetSf = subs.find(s => s.id === targetParent);
+        if (!targetSf) return working;
+  const pFirst = (first.data as any).priority as number;
+  const pTarget = (targetSf.data as any).priority as number;
+        working = working.map(n => {
+          if (n.type !== 'subflow') return n;
+          if (n.id === first.id) return { ...n, data: { ...(n.data||{}), priority: pTarget } };
+          if (n.id === targetSf.id) return { ...n, data: { ...(n.data||{}), priority: pFirst } };
+          return n;
+        });
+        return normalize(working);
+      }
+
+      // Case 2: action -> action across different subflows: swap their parent subflow priorities
+      if (sourceNode.type === 'action' && targetNode.type === 'action' && sourceParent && targetParent && sourceParent !== targetParent) {
+        const subs = working.filter(n => n.type === 'subflow');
+        const a = subs.find(s => s.id === sourceParent);
+        const b = subs.find(s => s.id === targetParent);
+        if (!a || !b) return working;
+  const pa = (a.data as any)?.priority as number;
+  const pb = (b.data as any)?.priority as number;
+        // If equal (shouldn't after normalize), still proceed by leaving unchanged
+        if (pa === pb) {
+          return working; // nothing to do
+        }
+        working = working.map(n => {
+          if (n.type !== 'subflow') return n;
+          if (n.id === a.id) return { ...n, data: { ...(n.data||{}), priority: pb } };
+          if (n.id === b.id) return { ...n, data: { ...(n.data||{}), priority: pa } };
+          return n;
+        });
+        return normalize(working);
+      }
+      return working; // other connection types ignored
     });
-    // Do not add a manual edge; auto-edge recomputation will reflect new order.
-  }, [setNodes]);
+    // After node adjustments, handle edge creation for same-subflow action connections.
+    setEdges(es => {
+      // Only add for same-subflow action->action (we re-evaluate conditions here)
+      const sourceNode = nodes.find(n => n.id === source);
+      const targetNode = nodes.find(n => n.id === target);
+      const sourceParent = (sourceNode as any)?.parentNode;
+      const targetParent = (targetNode as any)?.parentNode;
+      if (sourceNode?.type === 'action' && targetNode?.type === 'action' && sourceParent && sourceParent === targetParent) {
+        const id = `${source}-${target}`;
+        // Remove existing outgoing edges from source within same subflow to keep linear chain assumption
+        let next = es.filter(e => !(e.source === source && e.source !== target));
+        if (!next.some(e => e.id === id)) {
+          next = [...next, { id, source, target, animated: true }];
+        }
+        return next;
+      }
+      return es; // other cases: edges auto-managed
+    });
+  }, [setNodes, setEdges, nodes]);
 
 
   const onSelectionChange = (params: OnSelectionChangeParams) => {

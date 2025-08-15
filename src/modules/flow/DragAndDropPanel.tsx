@@ -156,6 +156,38 @@ export const DragAndDropPanel: React.FC = () => {
     }
   };
 
+  const exportFlows = () => {
+    const nodes = reactFlow.getNodes();
+    const subflows = nodes.filter(n => n.type === 'subflow').map(sf => {
+      const actions = nodes.filter(a => a.type === 'action' && a.parentNode === sf.id);
+      return {
+        id: sf.id,
+        type: sf.type,
+        position: sf.position,
+        style: sf.style,
+        data: sf.data,
+        nodes: actions.map(a => ({
+          id: a.id,
+          type: a.type,
+          position: a.position,
+            parentNode: a.parentNode,
+          data: a.data,
+          style: a.style
+        }))
+      };
+    });
+    const payload = { subflows };
+    const json = JSON.stringify(payload, null, 2);
+    try { navigator.clipboard?.writeText(json).catch(()=>{}); } catch (_e) { /* ignore */ }
+    // eslint-disable-next-line no-console
+    console.log('[Flow Export]', json);
+    // Optional quick feedback
+    try {
+      const evt = new CustomEvent('flowExported', { detail: { count: subflows.length } });
+      window.dispatchEvent(evt);
+    } catch(_e) { /* ignore */ }
+  };
+
   return (
     <div className="dnd-panel flex flex-col gap-3 text-xs max-w-[220px]">
       <div className="flex flex-col gap-2 border-t pt-2">
@@ -201,6 +233,14 @@ export const DragAndDropPanel: React.FC = () => {
           aria-label="Add Subflow"
         >
           ➕ <span>Criar Fluxo</span>
+        </button>
+        <button
+          onClick={exportFlows}
+          className="px-3 py-1.5 rounded-md bg-neutral-600 hover:bg-neutral-500 active:bg-neutral-700 text-white font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          title="Exportar JSON"
+          aria-label="Export JSON"
+        >
+          📤 <span>Salvar (Console Log)</span>
         </button>
       </div>
     </div>
